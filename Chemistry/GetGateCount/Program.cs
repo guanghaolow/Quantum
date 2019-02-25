@@ -19,6 +19,8 @@ using Microsoft.Quantum.Chemistry.JordanWigner;
 // To count gates, we'll use the trace simulator provided with
 // the Quantum Development Kit.
 using Microsoft.Quantum.Simulation.Simulators.QCTraceSimulators;
+using Microsoft.Quantum.Simulation.QCTraceSimulatorRuntime;
+using Microsoft.Quantum.Simulation.Simulators;
 
 // The System namespace provides a number of useful built-in
 // types and methods that we'll use throughout this sample.
@@ -65,6 +67,7 @@ namespace Microsoft.Quantum.Chemistry.Samples
         public double CNOTCount;
         public double NormMultipler;
         public long ElapsedMilliseconds;
+        public double Qubits;
         public Dictionary<string, string> TraceSimulationStats;
 
         public override string ToString()
@@ -75,7 +78,8 @@ namespace Microsoft.Quantum.Chemistry.Samples
                     $"# T:{TCount}, \r\n" +
                     $"# Rotations:{RotationsCount}, \r\n" +
                     $"# CNOT:{CNOTCount}, \r\n" +
-                    $"Norm Multipler:{NormMultipler}";
+                    $"Norm Multipler:{NormMultipler}, \r\n" +
+                    $"Qubits:{Qubits}";
         }
     }
 
@@ -236,8 +240,8 @@ namespace Microsoft.Quantum.Chemistry.Samples
         internal static async Task<GateCountResults> RunGateCount(JordanWignerEncodingData qSharpData, HamiltonianSimulationConfig config)
         {
             // Creates and configures Trace simulator for accumulating gate counts.
-            QCTraceSimulator sim = CreateAndConfigureTraceSim();
-
+            // QCTraceSimulator sim = CreateAndConfigureTraceSim();
+            ResourcesEstimator sim = CreateAndConfigureResEst();
             // Create stop-watch to measure the execution time
             Stopwatch stopWatch = new Stopwatch();
 
@@ -257,7 +261,8 @@ namespace Microsoft.Quantum.Chemistry.Samples
                     RotationsCount = sim.GetMetric<RunTrotterStep>(PrimitiveOperationsGroupsNames.R),
                     TCount = sim.GetMetric<RunTrotterStep>(PrimitiveOperationsGroupsNames.T),
                     CNOTCount = sim.GetMetric<RunTrotterStep>(PrimitiveOperationsGroupsNames.CNOT),
-                    TraceSimulationStats = sim.ToCSV()
+                    TraceSimulationStats = sim.ToCSV(),
+                    Qubits = sim.GetMetric<RunTrotterStep>(WidthCounter.Metrics.BorrowedWith)+ sim.GetMetric<RunTrotterStep>(WidthCounter.Metrics.InputWidth) + sim.GetMetric<RunTrotterStep>(WidthCounter.Metrics.ExtraWidth)
                 };
 
                 // Dump all the statistics to CSV files, one file per statistics collector
@@ -280,7 +285,6 @@ namespace Microsoft.Quantum.Chemistry.Samples
                     stopWatch.Reset();
                     stopWatch.Start();
                     var res = await RunQubitizationStep.Run(sim, qSharpData);
-
                     stopWatch.Stop();
 
                     gateCountResults = new GateCountResults
@@ -290,7 +294,9 @@ namespace Microsoft.Quantum.Chemistry.Samples
                         RotationsCount = sim.GetMetric<RunQubitizationStep>(PrimitiveOperationsGroupsNames.R),
                         TCount = sim.GetMetric<RunQubitizationStep>(PrimitiveOperationsGroupsNames.T),
                         CNOTCount = sim.GetMetric<RunQubitizationStep>(PrimitiveOperationsGroupsNames.CNOT),
-                        TraceSimulationStats = sim.ToCSV()
+                        NormMultipler = res,
+                        TraceSimulationStats = sim.ToCSV(),
+                        Qubits = sim.GetMetric<RunQubitizationStep>(WidthCounter.Metrics.BorrowedWith) + sim.GetMetric<RunQubitizationStep>(WidthCounter.Metrics.InputWidth) + sim.GetMetric<RunQubitizationStep>(WidthCounter.Metrics.ExtraWidth)
                     };
 
                     // Dump all the statistics to CSV files, one file per statistics collector
@@ -328,7 +334,9 @@ namespace Microsoft.Quantum.Chemistry.Samples
                         RotationsCount = sim.GetMetric<RunOptimizedQubitizationStep>(PrimitiveOperationsGroupsNames.R),
                         TCount = sim.GetMetric<RunOptimizedQubitizationStep>(PrimitiveOperationsGroupsNames.T),
                         CNOTCount = sim.GetMetric<RunOptimizedQubitizationStep>(PrimitiveOperationsGroupsNames.CNOT),
-                        TraceSimulationStats = sim.ToCSV()
+                        NormMultipler = res,
+                        TraceSimulationStats = sim.ToCSV(),
+                        Qubits = sim.GetMetric<RunOptimizedQubitizationStep>(WidthCounter.Metrics.BorrowedWith) + sim.GetMetric<RunOptimizedQubitizationStep>(WidthCounter.Metrics.InputWidth) + sim.GetMetric<RunOptimizedQubitizationStep>(WidthCounter.Metrics.ExtraWidth)
                     };
 
                     // Dump all the statistics to CSV files, one file per statistics collector
@@ -353,13 +361,20 @@ namespace Microsoft.Quantum.Chemistry.Samples
             var config = new QCTraceSimulatorConfiguration()
             {
                 usePrimitiveOperationsCounter = true,
-                throwOnUnconstraintMeasurement = false
+                throwOnUnconstraintMeasurement = false,
+                useWidthCounter = true
             };
 
             return new QCTraceSimulator(config);
         }
         #endregion
 
+        #region Configure resource estimator
+        private static ResourcesEstimator CreateAndConfigureResEst()
+        {
+            return new ResourcesEstimator();
+        }
+        #endregion
         
     }
 
